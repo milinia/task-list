@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-protocol DetailTaskRouterProtocol {
+protocol DetailTaskRouterProtocol: AnyObject {
     func navigateBack(task: UserTask)
 }
 

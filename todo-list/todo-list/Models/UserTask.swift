@@ -14,12 +14,4 @@ struct UserTask: Hashable, Equatable, Identifiable {
     var description: String
     var isCompleted: Bool
     let createdAt: String
-    
-//    static func == (lhs: UserTask, rhs: UserTask) -> Bool {
-//        return lhs.id == rhs.id
-//    }
-//    
-//    func hash(into hasher: inout Hasher) {
-//        hasher.combine(id)
-//    }
 }

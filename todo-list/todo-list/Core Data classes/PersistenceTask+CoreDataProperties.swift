@@ -4,7 +4,6 @@
 //
 //  Created by Evelina on 22.11.2024.
 //
-//
 
 import Foundation
 import CoreData
@@ -12,18 +11,16 @@ import CoreData
 
 extension PersistenceTask {
 
-    @nonobjc public class func fetchRequest() -> NSFetchRequest<PersistenceTask> {
+    @nonobjc class func fetchRequest() -> NSFetchRequest<PersistenceTask> {
         return NSFetchRequest<PersistenceTask>(entityName: "PersistenceTask")
     }
 
-    @NSManaged public var id: UUID
-    @NSManaged public var title: String
-    @NSManaged public var isCompleted: Bool
-    @NSManaged public var taskDescription: String
-    @NSManaged public var createdAt: String
+    @NSManaged var id: UUID
+    @NSManaged var title: String
+    @NSManaged var isCompleted: Bool
+    @NSManaged var taskDescription: String
+    @NSManaged var createdAt: String
 
 }
 
-extension PersistenceTask : Identifiable {
-
-}
+extension PersistenceTask : Identifiable {}

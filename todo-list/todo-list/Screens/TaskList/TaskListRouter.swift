@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-protocol TaskListRouterProtocol {
+protocol TaskListRouterProtocol: AnyObject {
     func routeToTaskDetails(with task: UserTask)
 }
 

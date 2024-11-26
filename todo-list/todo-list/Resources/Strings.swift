@@ -5,8 +5,6 @@
 //  Created by Evelina on 19.11.2024.
 //
 
-import Foundation
-
 enum Strings {
     
     static let tasks = "Задачи"

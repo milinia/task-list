@@ -8,11 +8,9 @@
 import Foundation
 import UIKit
 
-protocol DetailTaskViewProtocol: AnyObject {
-    
-}
+protocol DetailTaskViewProtocol: AnyObject {}
 
-class DetailTaskView: UIViewController, DetailTaskViewProtocol {
+final class DetailTaskView: UIViewController, DetailTaskViewProtocol {
     
     private enum UIConstants {
         static let textFieldFontSize: CGFloat = 34
@@ -41,6 +39,7 @@ class DetailTaskView: UIViewController, DetailTaskViewProtocol {
         let textField = UITextField()
         textField.text = task.title
         textField.borderStyle = .none
+        textField.backgroundColor = .systemBackground
         textField.font = .systemFont(ofSize: UIConstants.textFieldFontSize)
         textField.translatesAutoresizingMaskIntoConstraints = false
         return textField
@@ -67,7 +66,6 @@ class DetailTaskView: UIViewController, DetailTaskViewProtocol {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
         navigationController?.navigationBar.tintColor = .systemYellow
         setupViews()
         if task.title.isEmpty && task.description.isEmpty {
@@ -78,11 +76,21 @@ class DetailTaskView: UIViewController, DetailTaskViewProtocol {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
-        let newTask = UserTask(id: task.id, title: titleTextField.text ?? task.title,
-                               description: descriptionTextView.text ?? task.description,
-                               isCompleted: task.isCompleted,
-                               createdAt: task.createdAt)
-        presenter.taskDidEdit(task: newTask)
+        passDataBack()
+    }
+    
+    private func passDataBack() {
+        guard let title = titleTextField.text else { return }
+        guard let description = descriptionTextView.text else { return }
+        
+        if title != "" || description != "" {
+            let newTask = UserTask(id: task.id,
+                                   title: title,
+                                   description: description,
+                                   isCompleted: task.isCompleted,
+                                   createdAt: task.createdAt)
+            presenter.taskDidEdit(task: newTask)
+        }
     }
     
     private func setupViews() {

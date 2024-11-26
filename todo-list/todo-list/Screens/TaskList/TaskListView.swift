@@ -31,6 +31,7 @@ class TaskListView: UIViewController {
         static let textFieldIconSize: CGFloat = 20
         static let textFieldIconPadding: CGFloat = 8
         static let textFieldIconContainerSize: CGFloat = 36
+        static let addButtonIconPointSize: CGFloat = 18
     }
     
     private enum Section {
@@ -71,11 +72,14 @@ class TaskListView: UIViewController {
         
         let searchImageView = UIImageView(image: UIImage(systemName: Strings.Icons.magnifier))
         searchImageView.tintColor = .gray
-        let leftContainer = UIView(frame: CGRect(x: 0, y: 0,
+        let leftContainer = UIView(frame: CGRect(x: 0,
+                                                 y: 0,
                                                  width: UIConstants.textFieldIconContainerSize,
                                                  height: UIConstants.textFieldIconContainerSize))
-        searchImageView.frame = CGRect(x: UIConstants.textFieldIconPadding, y: UIConstants.textFieldIconPadding,
-                                       width: UIConstants.textFieldIconSize, height: UIConstants.textFieldIconSize)
+        searchImageView.frame = CGRect(x: UIConstants.textFieldIconPadding,
+                                       y: UIConstants.textFieldIconPadding,
+                                       width: UIConstants.textFieldIconSize,
+                                       height: UIConstants.textFieldIconSize)
         searchImageView.contentMode = .scaleAspectFit
         leftContainer.addSubview(searchImageView)
         textField.leftView = leftContainer
@@ -83,11 +87,14 @@ class TaskListView: UIViewController {
             
         let microphoneImageView = UIImageView(image: UIImage(systemName: Strings.Icons.microphone))
         microphoneImageView.tintColor = .gray
-        let rightContainer = UIView(frame: CGRect(x: 0, y: 0,
+        let rightContainer = UIView(frame: CGRect(x: 0,
+                                                  y: 0,
                                                   width: UIConstants.textFieldIconContainerSize,
                                                   height: UIConstants.textFieldIconContainerSize))
-        microphoneImageView.frame = CGRect(x: UIConstants.textFieldIconPadding, y: UIConstants.textFieldIconPadding,
-                                           width: UIConstants.textFieldIconSize, height: UIConstants.textFieldIconSize)
+        microphoneImageView.frame = CGRect(x: UIConstants.textFieldIconPadding,
+                                           y: UIConstants.textFieldIconPadding,
+                                           width: UIConstants.textFieldIconSize,
+                                           height: UIConstants.textFieldIconSize)
         microphoneImageView.contentMode = .scaleAspectFit
         rightContainer.addSubview(microphoneImageView)
         textField.rightView = rightContainer
@@ -106,7 +113,10 @@ class TaskListView: UIViewController {
     
     private lazy var addTaskButton: UIButton = {
         let button = UIButton()
-        button.setImage(UIImage(systemName: Strings.Icons.addTask), for: .normal)
+        let largeConfig = UIImage.SymbolConfiguration(pointSize: UIConstants.addButtonIconPointSize,
+                                                      weight: .regular,
+                                                      scale: .large)
+        button.setImage(UIImage(systemName: Strings.Icons.addTask, withConfiguration: largeConfig), for: .normal)
         button.tintColor = .systemYellow
         button.addTarget(self, action: #selector(addTaskButtonTapped), for: .touchUpInside)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -117,8 +127,10 @@ class TaskListView: UIViewController {
         let tableView = UITableView()
         tableView.showsVerticalScrollIndicator = false
         tableView.delegate = self
-        tableView.separatorInset = .init(top: 0, left: UIConstants.horizontalContentInset,
-                                         bottom: 0, right: UIConstants.horizontalContentInset)
+        tableView.separatorInset = .init(top: 0,
+                                         left: UIConstants.horizontalContentInset,
+                                         bottom: 0,
+                                         right: UIConstants.horizontalContentInset)
         tableView.register(TaskListCell.self, forCellReuseIdentifier: String(describing: TaskListCell.self))
         tableView.translatesAutoresizingMaskIntoConstraints = false
         return tableView
@@ -180,8 +192,8 @@ class TaskListView: UIViewController {
             taskCountLabel.topAnchor.constraint(equalTo: bottomView.topAnchor, constant: UIConstants.bottomViewTopContentInset),
             taskCountLabel.centerXAnchor.constraint(equalTo: bottomView.centerXAnchor),
             
-            addTaskButton.topAnchor.constraint(equalTo: bottomView.topAnchor, constant: UIConstants.bottomViewTopContentInset),
-            addTaskButton.trailingAnchor.constraint(equalTo: bottomView.trailingAnchor, constant: -UIConstants.horizontalContentInset)
+            addTaskButton.centerYAnchor.constraint(equalTo: taskCountLabel.centerYAnchor),
+            addTaskButton.trailingAnchor.constraint(equalTo: bottomView.trailingAnchor, constant: -UIConstants.horizontalContentInset),
         ])
     }
     
@@ -211,9 +223,7 @@ class TaskListView: UIViewController {
             }
             
             let shareAction = UIAction(title: NSLocalizedString(Strings.share, comment: ""),
-                                       image: UIImage(named: Strings.Icons.share)) { action in
-                self.shareTask(cell: cell)
-            }
+                                       image: UIImage(named: Strings.Icons.share)) { _ in }
 
             let deleteAction = UIAction(title: NSLocalizedString(Strings.delete, comment: ""),
                                         image: UIImage(named: Strings.Icons.trash),
@@ -231,13 +241,10 @@ class TaskListView: UIViewController {
         presenter.openDetails(for: task)
     }
     
-    private func shareTask(cell: TaskListCell) {
-        
-    }
-    
     private func deleteTask(cell: TaskListCell) {
         guard let task = cell.task else { return }
         guard let removed = tasks.removeValue(forKey: task.id) else { return }
+        
         snapshot.deleteItems([removed.id])
         dataSource.apply(snapshot, animatingDifferences: true)
         
@@ -246,22 +253,12 @@ class TaskListView: UIViewController {
     }
     
     private func updateTaskCountLabel() {
-        taskCountLabel.text = "\(tasks.count) \(pluralizeTask(for: tasks.count))"
+        taskCountLabel.text = pluralizeTask(for: tasks.count)
     }
     
     private func pluralizeTask(for count: Int) -> String {
-        let lastDigit = count % 10
-        let lastTwoDigits = count % 100
-            
-        if lastTwoDigits >= 11 && lastTwoDigits <= 14 {
-            return Strings.tasksShort
-        } else if lastDigit == 1 {
-            return Strings.task
-        } else if lastDigit >= 2 && lastDigit <= 4 {
-            return Strings.tasks
-        } else {
-           return Strings.tasksShort
-        }
+        let formatString = NSLocalizedString("tasks_count", comment: "")
+        return String.localizedStringWithFormat(formatString, count)
     }
 }
 
@@ -330,7 +327,9 @@ extension TaskListView: TaskListViewProtocol {
     
     func addTask(task: UserTask) {
         tasks[task.id] = task
+        
         updateTaskCountLabel()
+        
         snapshot.appendItems([task.id])
         dataSource.apply(snapshot, animatingDifferences: true)
     }

@@ -7,15 +7,15 @@
 
 import Foundation
 
-protocol TaskListInteractorProtocol {
-    func loadTasksFromNetwork() async throws -> [UserTask]
-    func loadTasksFromPersistence() async throws -> [UserTask]
-    func saveTask(task: UserTask) throws
-    func editTask(newTask: UserTask) throws
-    func deleteTask(task: UserTask) throws
+protocol TaskListInteractorProtocol: AnyObject {
+    func loadTasksFromNetwork()
+    func loadTasksFromPersistence(completion: @escaping (Result<[UserTask], Error>) -> Void)
+    func saveTask(task: UserTask)
+    func editTask(newTask: UserTask)
+    func deleteTask(task: UserTask)
     func getTasks() -> [UserTask]
     func formatDate(date: Date) -> String
-    func searchTasks(query: String) -> [UserTask]
+    func searchTasks(query: String, completion: @escaping ([UserTask]) -> Void)
 }
 
 final class TaskListInteractor: TaskListInteractorProtocol {
@@ -24,7 +24,7 @@ final class TaskListInteractor: TaskListInteractorProtocol {
     private let networkService: NetworkServiceProtocol
     private let persistenceService: PersistenceServiceProtocol
     
-    private var tasks: [UserTask] = []
+    var tasks: [UserTask] = []
     
     private var dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -37,65 +37,84 @@ final class TaskListInteractor: TaskListInteractorProtocol {
         self.persistenceService = persistenceService
     }
     
-    func loadTasksFromNetwork() async throws -> [UserTask] {
-        let todos = try await networkService.fetchTodos()
-        tasks = todos.map({UserTask(id: UUID(), title: $0.todo,
-                               description: $0.todo,
-                               isCompleted: $0.completed,
-                               createdAt: dateFormatter.string(from: .now))})
-        do {
-            try saveTaskToPersistence(tasks: tasks)
-        } catch {
-            throw error
-        }
-        return tasks
-    }
-    
-    func loadTasksFromPersistence() async throws -> [UserTask] {
-        do {
-            self.tasks = try persistenceService.getTasks()
-            return tasks
-        } catch {
-            throw error
+    func loadTasksFromNetwork() {
+        networkService.fetchTodos { [weak self] result in
+            guard let self else { return }
+            switch result {
+                case .success(let todos):
+                    tasks = todos.map({UserTask(id: UUID(),
+                                                     title: $0.todo,
+                                                     description: $0.todo,
+                                                     isCompleted: $0.completed,
+                                                     createdAt: self.formatDate(date: .now))})
+                saveTaskToPersistence(tasks: tasks)
+                presenter?.didFetchTasks(tasks: tasks)
+                case .failure(let error):
+                    presenter?.didCatchError(error: error)
+            }
         }
     }
     
-    func saveTask(task: UserTask) throws {
-        self.tasks.append(task)
-        do {
-            try saveTaskToPersistence(tasks: [task])
-        } catch {
-            throw error
+    func loadTasksFromPersistence(completion: @escaping (Result<[UserTask], Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            persistenceService.getTasks { result in
+                switch result {
+                case .success(let tasks):
+                    self.tasks = tasks
+                    completion(.success(tasks))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
         }
     }
     
-    private func saveTaskToPersistence(tasks: [UserTask]) throws {
-        do {
-            // надо как-то на фоновый поток вынести
-            try persistenceService.saveTasks(tasks: tasks)
-        } catch {
-            throw error
+    func saveTask(task: UserTask) {
+        tasks.append(task)
+        saveTaskToPersistence(tasks: [task])
+    }
+    
+    private func saveTaskToPersistence(tasks: [UserTask]) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            persistenceService.saveTasks(tasks: tasks) { result in
+                switch result {
+                case .success: break
+                case .failure(let error):
+                    self.presenter?.didCatchError(error: error)
+                }
+            }
         }
     }
     
-    func editTask(newTask: UserTask) throws {
+    func editTask(newTask: UserTask) {
         guard let index = tasks.firstIndex(where: {$0.id == newTask.id}) else { return }
         tasks[index] = newTask
-        do {
-            // надо как-то на фоновый поток вынести
-            try persistenceService.editTask(newTask: newTask)
-        } catch {
-            throw error
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            persistenceService.editTask(newTask: newTask) { result in
+                switch result {
+                case .success: break
+                case .failure(let error):
+                    self.presenter?.didCatchError(error: error)
+                }
+            }
         }
     }
     
-    func deleteTask(task: UserTask) throws {
+    func deleteTask(task: UserTask) {
         tasks.removeAll(where: {$0.id == task.id})
-        do {
-            // надо как-то на фоновый поток вынести
-            try persistenceService.deleteTask(task: task)
-        } catch {
-            throw error
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            persistenceService.deleteTask(task: task) { result in
+                switch result {
+                case .success: break
+                case .failure(let error):
+                    self.presenter?.didCatchError(error: error)
+                }
+            }
         }
     }
     
@@ -107,7 +126,10 @@ final class TaskListInteractor: TaskListInteractorProtocol {
         return dateFormatter.string(from: date)
     }
     
-    func searchTasks(query: String) -> [UserTask] {
-        return tasks.filter({$0.title.lowercased().contains(query) || $0.description.lowercased().contains(query)})
+    func searchTasks(query: String, completion: @escaping ([UserTask]) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {  [weak self] in
+            let filteredTasks = self?.tasks.filter({$0.title.lowercased().contains(query) || $0.description.lowercased().contains(query)})
+            completion(filteredTasks ?? [])
+        }
     }
 }

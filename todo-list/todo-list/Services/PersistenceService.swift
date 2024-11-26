@@ -10,65 +10,78 @@ import CoreData
 import UIKit
 
 protocol PersistenceServiceProtocol {
-    func getTasks() throws -> [UserTask]
-    func deleteTask(task: UserTask) throws
-    func editTask(newTask: UserTask) throws
-    func saveTasks(tasks: [UserTask]) throws
+    func getTasks(completion: @escaping (Result<[UserTask], Error>) -> Void)
+    func deleteTask(task: UserTask, completion: @escaping (Result<Void, Error>) -> Void)
+    func editTask(newTask: UserTask, completion: @escaping (Result<Void, Error>) -> Void)
+    func saveTasks(tasks: [UserTask], completion: @escaping (Result<Void, Error>) -> Void)
 }
 
 final class PersistenceService: PersistenceServiceProtocol {
     
-    // MARK: - Private properties
     private let context: NSManagedObjectContext? = {
         guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {return nil}
         return appDelegate.persistentContainer.viewContext
     }()
     
-    // MARK: - Implement PersistenceServiceProtocol
-    
-    func getTasks() throws -> [UserTask] {
-        guard let unwrappedContext = context else { return [] }
+    func getTasks(completion: @escaping (Result<[UserTask], Error>) -> Void) {
+        guard let unwrappedContext = context else {
+            completion(.failure(AppError.coreDataError))
+            return
+        }
         do {
             let requestResult: [todo_list.PersistenceTask] = try unwrappedContext.fetch(PersistenceTask.fetchRequest())
-            return requestResult.map({UserTask(id: $0.id, title: $0.title,
-                                                description: $0.taskDescription,
-                                                isCompleted: $0.isCompleted,
-                                                createdAt: $0.createdAt)})
+            let result = requestResult.map({UserTask(id: $0.id,
+                                                     title: $0.title,
+                                                     description: $0.taskDescription,
+                                                     isCompleted: $0.isCompleted,
+                                                     createdAt: $0.createdAt)})
+            completion(.success(result))
         } catch {
-            throw AppError.coreDataError
+            completion(.failure(AppError.coreDataError))
         }
     }
     
-    func deleteTask(task: UserTask) throws {
-        guard let unwrappedContext = context else { return }
+    func deleteTask(task: UserTask, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let unwrappedContext = context else {
+            completion(.failure(AppError.coreDataError))
+            return
+        }
         let request = PersistenceTask.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", task.id.uuidString)
-        guard let taskToDelete = try unwrappedContext.fetch(request).first else { return }
-        unwrappedContext.delete(taskToDelete)
         do {
+            guard let taskToDelete = try unwrappedContext.fetch(request).first else { return }
+            unwrappedContext.delete(taskToDelete)
             try unwrappedContext.save()
+            completion(.success(()))
         } catch {
-            throw AppError.coreDataError
+            completion(.failure(AppError.coreDataError))
         }
     }
     
-    func editTask(newTask: UserTask) throws {
-        guard let unwrappedContext = context else { return }
+    func editTask(newTask: UserTask, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let unwrappedContext = context else {
+            completion(.failure(AppError.coreDataError))
+            return
+        }
         let request = PersistenceTask.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", newTask.id.uuidString)
-        guard let taskToEdit = try unwrappedContext.fetch(request).first else { return }
-        taskToEdit.taskDescription = newTask.description
-        taskToEdit.title = newTask.title
-        taskToEdit.isCompleted = newTask.isCompleted
         do {
+            guard let taskToEdit = try unwrappedContext.fetch(request).first else { return }
+            taskToEdit.taskDescription = newTask.description
+            taskToEdit.title = newTask.title
+            taskToEdit.isCompleted = newTask.isCompleted
             try unwrappedContext.save()
+            completion(.success(()))
         } catch {
-            throw AppError.coreDataError
+            completion(.failure(AppError.coreDataError))
         }
     }
     
-    func saveTasks(tasks: [UserTask]) throws {
-        guard let unwrappedContext = context else { return }
+    func saveTasks(tasks: [UserTask], completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let unwrappedContext = context else {
+            completion(.failure(AppError.coreDataError))
+            return
+        }
         tasks.forEach({
             let persistenceTask = PersistenceTask(context: unwrappedContext)
             persistenceTask.id = $0.id
@@ -79,8 +92,9 @@ final class PersistenceService: PersistenceServiceProtocol {
         })
         do {
             try unwrappedContext.save()
+            completion(.success(()))
         } catch {
-            throw AppError.coreDataError
+            completion(.failure(AppError.coreDataError))
         }
     }
 }

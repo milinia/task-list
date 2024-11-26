@@ -7,19 +7,28 @@
 
 import Foundation
 
-// network requests for data in first enterance
-
 protocol NetworkServiceProtocol {
-    func fetchTodos() async throws -> [ToDo]
+    func fetchTodos(completion: @escaping (Result<[ToDo], AppError>) -> Void)
 }
 
 final class NetworkService: NetworkServiceProtocol {
     
-    func fetchTodos() async throws -> [ToDo] {
-        let url = URL(string: "https://dummyjson.com/todos")!
-        let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url))
-        let responseData: TaskResponse = try JSONDecoder().decode(TaskResponse.self, from: data)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { throw AppError.networkError}
-        return responseData.todos
+    func fetchTodos(completion: @escaping (Result<[ToDo], AppError>) -> Void) {
+        guard let url = URL(string: "https://dummyjson.com/todos") else {
+            completion(.failure(.invalidURL))
+            return
+        }
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let data = data, error == nil {
+                do {
+                    let responseData: TaskResponse = try JSONDecoder().decode(TaskResponse.self, from: data)
+                    completion(.success(responseData.todos))
+                } catch {
+                    completion(.failure(.decodeError))
+                }
+            } else {
+                completion(.failure(.networkError))
+            }
+        }.resume()
     }
 }

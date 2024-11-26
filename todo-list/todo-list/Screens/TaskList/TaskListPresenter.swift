@@ -15,6 +15,8 @@ protocol TaskListPresenterProtocol: AnyObject {
     func openDetails(for task: UserTask)
     func createNewTask()
     func didEditTask(task: UserTask)
+    func didFetchTasks(tasks: [UserTask])
+    func didCatchError(error: Error)
     func makeSearch(with text: String)
 }
 
@@ -32,68 +34,47 @@ final class TaskListPresenter: TaskListPresenterProtocol {
     }
     
     func viewDidLoad() {
-        DispatchQueue.main.async {
-            self.view?.showLoading()
-        }
-        Task {
-            do {
-                let saved = try await interactor.loadTasksFromPersistence()
-                if saved.isEmpty {
-                    let downloadTasks = try await interactor.loadTasksFromNetwork()
-                    DispatchQueue.main.async {
-                        self.view?.showTasks(tasks: downloadTasks)
+        self.view?.showLoading()
+        interactor.loadTasksFromPersistence { [weak self] result in
+            switch result {
+                case .success(let tasks):
+                    if tasks.isEmpty {
+                        self?.interactor.loadTasksFromNetwork()
+                    } else {
+                        DispatchQueue.main.async {
+                            self?.view?.showTasks(tasks: tasks)
+                        }
                     }
-                } else {
-                    DispatchQueue.main.async {
-                        self.view?.showTasks(tasks: saved)
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.view?.showError(error: error)
-                }
+                case .failure(let error):
+                    self?.view?.showError(error: error)
             }
         }
     }
     
     func taskCreated(newTask: UserTask) {
-        do {
-            try interactor.saveTask(task: newTask)
-            DispatchQueue.main.async {
-                self.view?.addTask(task: newTask)
-            }
-        } catch {
-            DispatchQueue.main.async {
-                self.view?.showError(error: error)
-            }
+        interactor.saveTask(task: newTask)
+        DispatchQueue.main.async {
+            self.view?.addTask(task: newTask)
         }
     }
     
     func taskDeleted(task: UserTask) {
-        do {
-            try interactor.deleteTask(task: task)
-        } catch {
-            DispatchQueue.main.async {
-                self.view?.showError(error: error)
-            }
-        }
+        interactor.deleteTask(task: task)
     }
     
     func taskEdited(task: UserTask) {
-        do {
-            try interactor.editTask(newTask: task)
-            DispatchQueue.main.async {
-                self.view?.editTask(task: task)
-            }
-        } catch {
-            DispatchQueue.main.async {
-                self.view?.showError(error: error)
-            }
+        interactor.editTask(newTask: task)
+        DispatchQueue.main.async {
+            self.view?.editTask(task: task)
         }
     }
     
     func createNewTask() {
-        let newTask = UserTask(id: UUID(), title: "", description: "", isCompleted: false, createdAt: interactor.formatDate(date: .now))
+        let newTask = UserTask(id: UUID(),
+                               title: "",
+                               description: "",
+                               isCompleted: false,
+                               createdAt: interactor.formatDate(date: .now))
         router.routeToTaskDetails(with: newTask)
     }
     
@@ -109,13 +90,29 @@ final class TaskListPresenter: TaskListPresenterProtocol {
         }
     }
     
+    func didFetchTasks(tasks: [UserTask]) {
+        DispatchQueue.main.async {
+            self.view?.showTasks(tasks: tasks)
+        }
+    }
+    
+    func didCatchError(error: Error) {
+        DispatchQueue.main.async {
+            self.view?.showError(error: error)
+        }
+    }
+    
     func makeSearch(with text: String) {
         if !text.isEmpty && !isSearching {
             isSearching = true
-            let result = interactor.searchTasks(query: text.lowercased())
             DispatchQueue.main.async {
-                self.view?.showTasks(tasks: result)
-                self.isSearching = false
+                self.view?.showLoading()
+            }
+            interactor.searchTasks(query: text.lowercased()) { [weak self] result in
+                DispatchQueue.main.async {
+                    self?.view?.showTasks(tasks: result)
+                }
+                self?.isSearching = false
             }
         } else if text.isEmpty {
             DispatchQueue.main.async {
